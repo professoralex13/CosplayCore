@@ -5,8 +5,8 @@
 #include "stdint.h"
 
 typedef enum {
-  Left,
-  Right,
+    Left,
+    Right,
 } Channel;
 
 #define MAX_INPUT_VOLUME 0b111111
