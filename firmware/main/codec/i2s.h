@@ -9,4 +9,7 @@
 esp_err_t i2s_device_init(i2s_chan_handle_t *tx_handle,
                           i2s_chan_handle_t *rx_handle, uint8_t bclk_pin,
                           uint8_t ws_pin, uint8_t dout_pin, uint8_t din_pin);
+
+esp_err_t i2s_set_sample_rate(uint32_t sample_rate);
+
 #endif

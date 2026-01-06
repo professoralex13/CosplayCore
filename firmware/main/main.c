@@ -35,7 +35,7 @@ void app_main(void) {
     set_dac_volume(ext_int_codec, Left, MAX_DAC_VOLUME);
     set_dac_volume(ext_int_codec, Right, MAX_DAC_VOLUME);
 
-    set_dac_mute(ext_int_codec, false);
+    set_dac_mute(ext_int_codec, true);
 
     set_input_volume(ext_int_codec, Left, MAX_INPUT_VOLUME);
     set_input_volume(ext_int_codec, Right, MAX_INPUT_VOLUME);
@@ -49,5 +49,5 @@ void app_main(void) {
     i2s_device_init(&tx, &rx, EXT_INT_CLK_PIN, EXT_INT_LRC_PIN, EXT_INT_DAC_PIN,
                     EXT_INT_ADC_PIN);
 
-    bluetooth_init(tx);
+    bluetooth_init(tx, ext_int_codec);
 }

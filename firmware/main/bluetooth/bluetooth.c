@@ -12,7 +12,7 @@
 #define BT_DEVICE_NAME "CosplayCore"
 #define PAIRING_BUTTON_GPIO 21
 
-void bluetooth_init(i2s_chan_handle_t i2s_handle) {
+void bluetooth_init(i2s_chan_handle_t i2s_handle, spi_codec_device codec_dev) {
     ESP_LOGI(TAG, "Starting Bluetooth speaker");
 
     // Initialize Bluetooth stack
@@ -22,7 +22,7 @@ void bluetooth_init(i2s_chan_handle_t i2s_handle) {
     esp_bt_gap_set_device_name(BT_DEVICE_NAME);
 
     // Initialize A2DP audio
-    ESP_ERROR_CHECK(bt_audio_init(i2s_handle));
+    ESP_ERROR_CHECK(bt_audio_init(i2s_handle, codec_dev));
 
     // Initialize pairing control
     bt_pairing_init(PAIRING_BUTTON_GPIO);
