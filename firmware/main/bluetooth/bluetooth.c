@@ -1,5 +1,6 @@
 #include "bluetooth.h"
 
+#include "bluetooth/bt_spp.h"
 #include "bt_audio.h"
 #include "bt_core.h"
 #include "bt_pairing.h"
@@ -26,6 +27,8 @@ void bluetooth_init(i2s_chan_handle_t i2s_handle, spi_codec_device codec_dev) {
 
     // Initialize pairing control
     bt_pairing_init(PAIRING_BUTTON_GPIO);
+
+    bt_spp_init();
 
     ESP_LOGI(TAG, "Bluetooth ready. Device name: %s", BT_DEVICE_NAME);
 }
