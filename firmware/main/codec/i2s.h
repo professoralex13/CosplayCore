@@ -12,4 +12,9 @@ esp_err_t i2s_device_init(i2s_chan_handle_t *tx_handle,
 
 esp_err_t i2s_set_sample_rate(uint32_t sample_rate);
 
+esp_err_t i2s_start_loopback(void);
+esp_err_t i2s_stop_loopback(void);
+
+esp_err_t i2s_reset_filters(void);
+
 #endif

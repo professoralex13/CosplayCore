@@ -4,7 +4,7 @@
 #include "codec/spi.h"
 #include "stdint.h"
 
-typedef enum {
+typedef enum : uint8_t {
     Left,
     Right,
 } Channel;
@@ -18,6 +18,11 @@ esp_err_t set_input_volume(spi_codec_device device, Channel channel,
 
 esp_err_t set_output_volume(spi_codec_device device, Channel channel,
                             uint8_t volume);
+
+#define MAX_ADC_VOLUME 0b11111111
+
+esp_err_t set_adc_volume(spi_codec_device device, Channel channel,
+                         uint8_t volume);
 
 esp_err_t set_digital_audio_interface(spi_codec_device device,
                                       uint8_t word_length);
@@ -39,5 +44,15 @@ esp_err_t set_output_mix(spi_codec_device device, Channel channel,
                          uint8_t leftVolume, uint8_t rightVolume);
 
 esp_err_t set_dac_mute(spi_codec_device device, bool mute);
+
+typedef enum {
+    Db00 = 0b00,
+    Db13 = 0b01,
+    Db20 = 0b10,
+    Db29 = 0b11,
+} MicBoostVolume;
+
+esp_err_t set_mic_boost(spi_codec_device device, Channel channel,
+                        MicBoostVolume volume);
 
 #endif

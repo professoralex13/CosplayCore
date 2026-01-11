@@ -84,6 +84,23 @@ esp_err_t set_output_volume(spi_codec_device device, Channel channel,
     return write_register(address, data, device);
 }
 
+esp_err_t set_adc_volume(spi_codec_device device, Channel channel,
+                         uint8_t volume) {
+    uint8_t address = channel == Left ? LeftADCVolume : RightADCVolume;
+
+    if (volume > MAX_ADC_VOLUME) {
+        ESP_LOGE(TAG, "Cannot set ADC volume greater than %d", MAX_ADC_VOLUME);
+
+        return ESP_FAIL;
+    }
+
+    bool update_immediate = true;
+
+    uint16_t data = (update_immediate << 8) | volume;
+
+    return write_register(address, data, device);
+}
+
 const int VALID_AUDIO_WORD_LENGTHS[] = {16, 20, 24, 32};
 
 typedef enum {
@@ -236,4 +253,15 @@ esp_err_t set_dac_mute(spi_codec_device device, bool mute) {
                      ((demphasis & 0b11) << 1) | adcpol;
 
     return write_register(ADCDACControl, value, device);
+}
+
+esp_err_t set_mic_boost(spi_codec_device device, Channel channel,
+                        MicBoostVolume volume) {
+    uint8_t address = channel == Left ? ADCLSignalPath : ADCRSignalPath;
+
+    uint8_t input_selection = 0;
+
+    uint16_t data = ((input_selection & 0b11) << 6) | ((volume & 0b11) << 4);
+
+    return write_register(address, data, device);
 }

@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "bt_spp.h"
+#include "messages.h"
 
 #define TAG "BT_SPP"
 
@@ -52,6 +53,7 @@ static void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param) {
             break;
         case ESP_SPP_DATA_IND_EVT:
             ESP_LOGI(TAG, "ESP_SPP_DATA_IND_EVT: %s", param->data_ind.data);
+            on_message_received(param->data_ind.data);
             break;
         case ESP_SPP_CONG_EVT:
             ESP_LOGI(TAG, "ESP_SPP_CONG_EVT");

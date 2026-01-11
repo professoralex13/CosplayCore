@@ -8,6 +8,8 @@
 #include "esp_gap_bt_api.h"
 #include "esp_log.h"
 
+#include "messages.h"
+
 #define TAG "BT"
 
 #define BT_DEVICE_NAME "CosplayCore"
@@ -31,4 +33,6 @@ void bluetooth_init(i2s_chan_handle_t i2s_handle, spi_codec_device codec_dev) {
     bt_spp_init();
 
     ESP_LOGI(TAG, "Bluetooth ready. Device name: %s", BT_DEVICE_NAME);
+
+    init_bt_control(codec_dev);
 }

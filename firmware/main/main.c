@@ -28,26 +28,35 @@ void app_main(void) {
 
     reset_registers(ext_int_codec);
 
-    set_power_management(ext_int_codec, false, false, true, true, true, true);
+    set_power_management(ext_int_codec, true, true, true, true, true, true);
 
     set_digital_audio_interface(ext_int_codec, 16);
 
     set_dac_volume(ext_int_codec, Left, MAX_DAC_VOLUME);
     set_dac_volume(ext_int_codec, Right, MAX_DAC_VOLUME);
 
-    set_dac_mute(ext_int_codec, true);
+    set_adc_volume(ext_int_codec, Left, 0b11000011);
+    set_adc_volume(ext_int_codec, Right, 0b11000011);
+
+    set_dac_mute(ext_int_codec, false);
 
     set_input_volume(ext_int_codec, Left, MAX_INPUT_VOLUME);
     set_input_volume(ext_int_codec, Right, MAX_INPUT_VOLUME);
 
-    set_output_mix(ext_int_codec, Left, MAX_MIX_VOLUME, 0);
-    set_output_mix(ext_int_codec, Right, 0, MAX_MIX_VOLUME);
+    // Output mix volumes are set to zero so only output to MIX is the DAC
+    set_output_mix(ext_int_codec, Left, 0, 0);
+    set_output_mix(ext_int_codec, Right, 0, 0);
 
     set_output_volume(ext_int_codec, Left, MAX_OUTPUT_VOLUME);
     set_output_volume(ext_int_codec, Right, MAX_OUTPUT_VOLUME);
 
+    set_mic_boost(ext_int_codec, Left, Db20);
+    set_mic_boost(ext_int_codec, Right, Db20);
+
     i2s_device_init(&tx, &rx, EXT_INT_CLK_PIN, EXT_INT_LRC_PIN, EXT_INT_DAC_PIN,
                     EXT_INT_ADC_PIN);
+
+    i2s_start_loopback();
 
     bluetooth_init(tx, ext_int_codec);
 }
