@@ -1,5 +1,6 @@
 #include "i2s.h"
 #include "driver/i2s_std.h"
+#include "driver/i2s_types.h"
 #include "esp_log.h"
 
 static const char *TAG = "WM8988";
@@ -12,7 +13,7 @@ esp_err_t i2s_device_init(i2s_chan_handle_t *tx_handle,
                           i2s_chan_handle_t *rx_handle, uint8_t bclk_pin,
                           uint8_t ws_pin, uint8_t dout_pin, uint8_t din_pin) {
     i2s_chan_config_t chan_cfg =
-        I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
+        I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
 
     esp_err_t result = i2s_new_channel(&chan_cfg, tx_handle, rx_handle);
 
