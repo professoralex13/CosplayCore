@@ -157,15 +157,9 @@ impl<'a, BUS: SpiBus, CS: OutputPin> Codec<'a, BUS, CS> {
         address: RegisterAddress,
         value: u16,
     ) -> Result<(), DeviceError<BUS::Error, CS::Error>> {
-        // WM8988 SPI format: 16-bit write
-        // Bits 15-9: 7-bit register address
-        // Bits 8-0: 9-bit register value
-        let data = (((address as u16) & 0x7F) << 9) | (value & 0x1FF);
+        let data = pack(address as u16, 9..16) | pack(value, 0..9);
 
-        // Send as two bytes: MSB first (big-endian)
-        let bytes = [((data >> 8) & 0xFF) as u8, (data & 0xFF) as u8];
-
-        self.device.write(&bytes)
+        self.device.write(&data.to_be_bytes())
     }
 
     pub fn get_input_volume(&self, channel: AudioChannel) -> u8 {

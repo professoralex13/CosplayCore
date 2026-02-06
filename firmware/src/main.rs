@@ -14,12 +14,10 @@ use esp_hal::gpio::Output;
 use esp_hal::main;
 use esp_hal::spi;
 use esp_hal::spi::master::Spi;
-use esp_hal::time::Rate;
 use esp_hal::time::{Duration, Instant};
 
 mod codec;
 use codec::Codec;
-use esp_println::println;
 
 use crate::codec::AudioChannel;
 use crate::codec::MAX_INPUT_VOLUME;
@@ -61,8 +59,8 @@ fn main() -> ! {
         .set_power_management(PowerConfig {
             adc_left: false,
             adc_right: false,
-            dac_left: false,
-            dac_right: false,
+            dac_left: true,
+            dac_right: true,
             left_out_1: true,
             right_out_1: true,
             pga_left: true,
