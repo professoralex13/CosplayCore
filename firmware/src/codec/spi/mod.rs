@@ -1,105 +1,15 @@
-use core::{cell::RefCell, convert::Into, ops::Range};
+use core::ops::Range;
 
 use embedded_hal::{
     digital::OutputPin,
     spi::{SpiBus, SpiDevice},
 };
-use embedded_hal_bus::spi::{DeviceError, RefCellDevice};
-use esp_hal::delay::Delay;
+use embedded_hal_bus::spi::DeviceError;
 
-#[derive(PartialEq, Copy, Clone)]
-pub enum AudioChannel {
-    Left,
-    Right,
-}
+use self::consts::{AudioWordLength, MAX_MIX_VOLUME, RegisterAddress};
+use super::{AudioChannel, ChannelPair, Codec, PowerConfig};
 
-#[derive(Default, Clone, Copy)]
-struct ChannelPair<T: Default> {
-    left: T,
-    right: T,
-}
-
-impl<T: Default + Copy> ChannelPair<T> {
-    pub fn new(left: T, right: T) -> Self {
-        Self { left, right }
-    }
-
-    fn get(&self, channel: AudioChannel) -> T {
-        match channel {
-            AudioChannel::Left => self.left,
-            AudioChannel::Right => self.right,
-        }
-    }
-
-    fn set(&mut self, channel: AudioChannel, value: T) {
-        match channel {
-            AudioChannel::Left => self.left = value,
-            AudioChannel::Right => self.right = value,
-        }
-    }
-}
-
-#[derive(Default, Debug, Clone, Copy)]
-pub struct PowerConfig {
-    pub adc_left: bool,
-    pub adc_right: bool,
-    pub dac_left: bool,
-    pub dac_right: bool,
-    pub left_out_1: bool,
-    pub right_out_1: bool,
-    pub pga_left: bool,
-    pub pga_right: bool,
-}
-
-pub struct Codec<'a, BUS: SpiBus, CS: OutputPin> {
-    device: RefCellDevice<'a, BUS, CS, Delay>,
-
-    input_volume: ChannelPair<u8>,
-
-    output_volume: ChannelPair<u8>,
-
-    mix: ChannelPair<ChannelPair<u8>>,
-
-    power_config: PowerConfig,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum RegisterAddress {
-    LeftInputVolume = 0x00,
-    RightInputVolume = 0x01,
-    LeftOutput1Volume = 0x02,
-    RightOutput1Volume = 0x03,
-    ADCDACControl = 0x05,
-    AudioInterface = 0x07,
-    SampleRate = 0x08,
-    LeftDACVolume = 0x0A,
-    RightDACVolume = 0x0B,
-    BassControl = 0x0C,
-    TrebleControl = 0x0D,
-    Reset = 0x0F,
-    Control3D = 0x10,
-    ALC1 = 0x11,
-    ALC2 = 0x12,
-    ALC3 = 0x13,
-    NoiseGate = 0x14,
-    LeftADCVolume = 0x15,
-    RightADCVolume = 0x16,
-    AdditionalControl1 = 0x17,
-    AdditionalControl2 = 0x18,
-    PowerManagement1 = 0x19,
-    PowerManagement2 = 0x1A,
-    AdditionalControl3 = 0x1B,
-    ADCInputMode = 0x1F,
-    ADCLSignalPath = 0x20,
-    ADCRSignalPath = 0x21,
-    LeftOutMix1 = 0x22,
-    LeftOutMix2 = 0x23,
-    RightOutMix1 = 0x24,
-    RightOutMix2 = 0x25,
-    LeftOutput2Volume = 0x28,
-    RightOutput2Volume = 0x29,
-    LowPowerPlayback = 0x43,
-}
+pub mod consts;
 
 fn mask(n: u8) -> u16 {
     if n >= 16 {
@@ -124,34 +34,7 @@ fn pack<T: Into<u16>>(value: T, bits: Range<u8>) -> u16 {
     return (repr & mask(n)) << bits.start;
 }
 
-pub const MAX_INPUT_VOLUME: u8 = 0b111111;
-pub const MAX_OUTPUT_VOLUME: u8 = 0b1111111;
-pub const MAX_MIX_VOLUME: u8 = 0b111;
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum MixInputSelection {
-    Input1 = 0b000,
-    Input2 = 0b001,
-    MicBoost = 0b011,
-    Differential = 0b100,
-}
-
 impl<'a, BUS: SpiBus, CS: OutputPin> Codec<'a, BUS, CS> {
-    pub fn new(bus: &'a RefCell<BUS>, cs: CS) -> Result<Self, DeviceError<BUS::Error, CS::Error>> {
-        let mut this = Self {
-            device: RefCellDevice::new(bus, cs, Delay::new())
-                .map_err(|err| DeviceError::<BUS::Error, CS::Error>::Cs(err))?,
-            input_volume: Default::default(),
-            output_volume: Default::default(),
-            power_config: Default::default(),
-            mix: Default::default(),
-        };
-
-        this.reset_codec()?;
-
-        Ok(this)
-    }
-
     fn write_register(
         &mut self,
         address: RegisterAddress,
@@ -159,7 +42,7 @@ impl<'a, BUS: SpiBus, CS: OutputPin> Codec<'a, BUS, CS> {
     ) -> Result<(), DeviceError<BUS::Error, CS::Error>> {
         let data = pack(address as u16, 9..16) | pack(value, 0..9);
 
-        self.device.write(&data.to_be_bytes())
+        self.spi.write(&data.to_be_bytes())
     }
 
     pub fn get_input_volume(&self, channel: AudioChannel) -> u8 {
@@ -276,6 +159,13 @@ impl<'a, BUS: SpiBus, CS: OutputPin> Codec<'a, BUS, CS> {
             RegisterAddress::RightOutMix2
         };
 
+        pub enum MixInputSelection {
+            Input1 = 0b000,
+            Input2 = 0b001,
+            MicBoost = 0b011,
+            Differential = 0b100,
+        }
+
         let mix_input_selection = MixInputSelection::MicBoost;
 
         let left_dac = channel == AudioChannel::Left;
@@ -302,6 +192,85 @@ impl<'a, BUS: SpiBus, CS: OutputPin> Codec<'a, BUS, CS> {
         Ok(())
     }
 
+    pub fn set_digital_audio_interface(
+        &mut self,
+        word_length: AudioWordLength,
+    ) -> Result<(), DeviceError<BUS::Error, CS::Error>> {
+        let invert_bclk = false;
+        let master_mode = false;
+        let swap_left_right = false;
+        let invert_lrc_polarity = false;
+
+        enum AudioDataFormat {
+            LeftJustified = 0b01,
+            I2S = 0b10,
+            DSP = 0b11,
+        }
+
+        let audio_format = AudioDataFormat::I2S;
+
+        let data = pack(invert_bclk, 7..8)
+            | pack(master_mode, 6..7)
+            | pack(swap_left_right, 5..6)
+            | pack(invert_lrc_polarity, 4..5)
+            | pack(word_length as u8, 2..4)
+            | pack(audio_format as u8, 0..2);
+
+        self.write_register(RegisterAddress::AudioInterface, data)?;
+
+        Ok(())
+    }
+
+    pub fn get_dac_volume(&self, channel: AudioChannel) -> u8 {
+        self.dac_volume.get(channel)
+    }
+
+    pub fn set_dac_volume(
+        &mut self,
+        channel: AudioChannel,
+        volume: u8,
+    ) -> Result<(), DeviceError<BUS::Error, CS::Error>> {
+        let address = if channel == AudioChannel::Left {
+            RegisterAddress::LeftDACVolume
+        } else {
+            RegisterAddress::RightDACVolume
+        };
+
+        let update_immediate = true;
+
+        let data = pack(update_immediate, 8..9) | pack(volume, 0..8);
+
+        self.write_register(address, data)?;
+
+        self.dac_volume.set(channel, volume);
+
+        Ok(())
+    }
+
+    pub fn set_dac_mute(&mut self, mute: bool) -> Result<(), DeviceError<BUS::Error, CS::Error>> {
+        let adc_attenuate = false;
+        let dac_attenuate = false;
+
+        let adchpd = false;
+
+        let hpor = false;
+        let adcpol: u8 = 0b00;
+
+        let demphasis: u8 = 0b00;
+
+        let data = pack(adc_attenuate, 8..9)
+            | pack(dac_attenuate, 7..8)
+            | pack(adcpol, 5..7)
+            | pack(hpor, 4..5)
+            | pack(mute, 3..4)
+            | pack(demphasis, 1..3)
+            | pack(adchpd, 0..1);
+
+        self.write_register(RegisterAddress::ADCDACControl, data)?;
+
+        Ok(())
+    }
+
     pub fn reset_codec(&mut self) -> Result<(), DeviceError<BUS::Error, CS::Error>> {
         self.write_register(RegisterAddress::Reset, 0)?;
 
@@ -315,6 +284,13 @@ impl<'a, BUS: SpiBus, CS: OutputPin> Codec<'a, BUS, CS> {
 
         self.set_mix(AudioChannel::Left, 0, 0)?;
         self.set_mix(AudioChannel::Right, 0, 0)?;
+
+        self.set_digital_audio_interface(AudioWordLength::Bit16)?;
+
+        self.set_dac_volume(AudioChannel::Left, 0)?;
+        self.set_dac_volume(AudioChannel::Right, 0)?;
+
+        self.set_dac_mute(false)?;
 
         Ok(())
     }

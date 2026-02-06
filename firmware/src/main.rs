@@ -12,16 +12,15 @@ use core::cell::RefCell;
 use esp_hal::{clock::CpuClock, gpio::Level};
 
 mod codec;
-use codec::Codec;
+use codec::{
+    AudioChannel, Codec, PowerConfig,
+    spi::consts::{MAX_DAC_VOLUME, MAX_INPUT_VOLUME, MAX_MIX_VOLUME, MAX_OUTPUT_VOLUME},
+};
 use esp_hal::{
     gpio::Output,
     main, spi,
     spi::master::Spi,
     time::{Duration, Instant},
-};
-
-use crate::codec::{
-    AudioChannel, MAX_INPUT_VOLUME, MAX_MIX_VOLUME, MAX_OUTPUT_VOLUME, PowerConfig,
 };
 
 #[panic_handler]
@@ -86,6 +85,13 @@ fn main() -> ! {
         .unwrap();
     codec1
         .set_mix(AudioChannel::Right, 0, MAX_MIX_VOLUME)
+        .unwrap();
+
+    codec1
+        .set_dac_volume(AudioChannel::Left, MAX_DAC_VOLUME)
+        .unwrap();
+    codec1
+        .set_dac_volume(AudioChannel::Right, MAX_DAC_VOLUME)
         .unwrap();
 
     loop {
