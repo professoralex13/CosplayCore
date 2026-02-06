@@ -1,11 +1,11 @@
-use core::cell::RefCell;
-use core::convert::Into;
-use core::ops::Range;
-use embedded_hal::spi::{Operation, SpiDevice};
-use embedded_hal::{digital::OutputPin, spi::SpiBus};
-use embedded_hal_bus::spi::{DeviceError, NoDelay, RefCellDevice};
-use esp_hal::delay::{self, Delay};
-use esp_println::println;
+use core::{cell::RefCell, convert::Into, ops::Range};
+
+use embedded_hal::{
+    digital::OutputPin,
+    spi::{SpiBus, SpiDevice},
+};
+use embedded_hal_bus::spi::{DeviceError, RefCellDevice};
+use esp_hal::delay::Delay;
 
 #[derive(PartialEq, Copy, Clone)]
 pub enum AudioChannel {

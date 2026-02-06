@@ -8,22 +8,21 @@
 #![deny(clippy::large_stack_frames)]
 
 use core::cell::RefCell;
-use esp_hal::clock::CpuClock;
-use esp_hal::gpio::Level;
-use esp_hal::gpio::Output;
-use esp_hal::main;
-use esp_hal::spi;
-use esp_hal::spi::master::Spi;
-use esp_hal::time::{Duration, Instant};
+
+use esp_hal::{clock::CpuClock, gpio::Level};
 
 mod codec;
 use codec::Codec;
+use esp_hal::{
+    gpio::Output,
+    main, spi,
+    spi::master::Spi,
+    time::{Duration, Instant},
+};
 
-use crate::codec::AudioChannel;
-use crate::codec::MAX_INPUT_VOLUME;
-use crate::codec::MAX_MIX_VOLUME;
-use crate::codec::MAX_OUTPUT_VOLUME;
-use crate::codec::PowerConfig;
+use crate::codec::{
+    AudioChannel, MAX_INPUT_VOLUME, MAX_MIX_VOLUME, MAX_OUTPUT_VOLUME, PowerConfig,
+};
 
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! {
