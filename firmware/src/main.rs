@@ -14,7 +14,7 @@ use esp_hal::{clock::CpuClock, gpio::Level};
 mod codec;
 use codec::{
     AudioChannel, Codec, PowerConfig,
-    spi::consts::{MAX_DAC_VOLUME, MAX_INPUT_VOLUME, MAX_MIX_VOLUME, MAX_OUTPUT_VOLUME},
+    spi::consts::{MAX_DAC_VOLUME, MAX_INPUT_VOLUME, MAX_MIX_VOLUME},
 };
 use esp_hal::{
     gpio::Output,
@@ -22,6 +22,8 @@ use esp_hal::{
     spi::master::Spi,
     time::{Duration, Instant},
 };
+
+use crate::codec::spi::consts::MicBoost;
 
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! {
@@ -66,18 +68,14 @@ fn main() -> ! {
         })
         .unwrap();
 
-    codec1
-        .set_input_volume(AudioChannel::Left, MAX_INPUT_VOLUME)
-        .unwrap();
-    codec1
-        .set_input_volume(AudioChannel::Right, MAX_INPUT_VOLUME)
-        .unwrap();
+    codec1.set_input_volume(AudioChannel::Left, 50).unwrap();
+    codec1.set_input_volume(AudioChannel::Right, 50).unwrap();
 
     codec1
-        .set_output_volume(AudioChannel::Left, MAX_OUTPUT_VOLUME)
+        .set_output_volume(AudioChannel::Left, 0b1100000)
         .unwrap();
     codec1
-        .set_output_volume(AudioChannel::Right, MAX_OUTPUT_VOLUME)
+        .set_output_volume(AudioChannel::Right, 0b1100000)
         .unwrap();
 
     codec1
@@ -92,6 +90,13 @@ fn main() -> ! {
         .unwrap();
     codec1
         .set_dac_volume(AudioChannel::Right, MAX_DAC_VOLUME)
+        .unwrap();
+
+    codec1
+        .set_mic_boost(AudioChannel::Left, MicBoost::Db29)
+        .unwrap();
+    codec1
+        .set_mic_boost(AudioChannel::Right, MicBoost::Db29)
         .unwrap();
 
     loop {

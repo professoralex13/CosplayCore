@@ -8,6 +8,7 @@ use embedded_hal_bus::spi::DeviceError;
 
 use self::consts::{AudioWordLength, MAX_MIX_VOLUME, RegisterAddress};
 use super::{AudioChannel, ChannelPair, Codec, PowerConfig};
+use crate::codec::spi::consts::MicBoost;
 
 pub mod consts;
 
@@ -267,6 +268,23 @@ impl<'a, BUS: SpiBus, CS: OutputPin> Codec<'a, BUS, CS> {
             | pack(adchpd, 0..1);
 
         self.write_register(RegisterAddress::ADCDACControl, data)?;
+
+        Ok(())
+    }
+
+    pub fn set_mic_boost(
+        &mut self,
+        channel: AudioChannel,
+        mic_boost: MicBoost,
+    ) -> Result<(), DeviceError<BUS::Error, CS::Error>> {
+        let address = match channel {
+            AudioChannel::Left => RegisterAddress::ADCLSignalPath,
+            AudioChannel::Right => RegisterAddress::ADCRSignalPath,
+        };
+
+        let data = pack(mic_boost as u16, 4..6);
+
+        self.write_register(address, data)?;
 
         Ok(())
     }

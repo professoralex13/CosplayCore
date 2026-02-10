@@ -44,6 +44,14 @@ pub enum AudioWordLength {
     Bit32 = 0b11,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum MicBoost {
+    Off = 0b00,
+    Db13 = 0b01,
+    Db20 = 0b10,
+    Db29 = 0b11,
+}
+
 pub const MAX_INPUT_VOLUME: u8 = 0b111111;
 pub const MAX_OUTPUT_VOLUME: u8 = 0b1111111;
 pub const MAX_MIX_VOLUME: u8 = 0b111;
