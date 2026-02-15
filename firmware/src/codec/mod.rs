@@ -1,9 +1,9 @@
-use core::cell::RefCell;
-
-use embedded_hal::{digital::OutputPin, spi::SpiBus};
-use embedded_hal_bus::spi::{DeviceError, RefCellDevice};
-use esp_idf_hal::delay::Delay;
-
+use esp_idf_hal::{
+    gpio::OutputPin,
+    i2s::{I2sBiDir, I2sDriver},
+    peripheral::Peripheral,
+    spi::{config::Config as SpiConfig, SpiDeviceDriver, SpiDriver},
+};
 pub mod spi;
 
 #[derive(PartialEq, Copy, Clone)]
@@ -50,8 +50,10 @@ pub struct PowerConfig {
     pub pga_right: bool,
 }
 
-pub struct Codec<'a, BUS: SpiBus, CS: OutputPin> {
-    spi: RefCellDevice<'a, BUS, CS, Delay>,
+pub struct Codec<'a> {
+    spi_device: SpiDeviceDriver<'a, &'a SpiDriver<'a>>,
+
+    pub i2s_driver: I2sDriver<'a, I2sBiDir>,
 
     input_volume: ChannelPair<u8>,
 
@@ -64,14 +66,15 @@ pub struct Codec<'a, BUS: SpiBus, CS: OutputPin> {
     dac_volume: ChannelPair<u8>,
 }
 
-impl<'a, BUS: SpiBus, CS: OutputPin> Codec<'a, BUS, CS> {
+impl<'a> Codec<'a> {
     pub fn new(
-        spi_bus: &'a RefCell<BUS>,
-        spi_cs: CS,
-    ) -> Result<Self, DeviceError<BUS::Error, CS::Error>> {
+        spi_driver: &'a SpiDriver,
+        spi_cs: impl Peripheral<P = impl OutputPin> + 'a,
+        i2s_driver: I2sDriver<'a, I2sBiDir>,
+    ) -> anyhow::Result<Self> {
         let mut this = Self {
-            spi: RefCellDevice::new(spi_bus, spi_cs, Delay::new_default())
-                .map_err(|err| DeviceError::<BUS::Error, CS::Error>::Cs(err))?,
+            spi_device: SpiDeviceDriver::new(spi_driver, Some(spi_cs), &SpiConfig::new())?,
+            i2s_driver,
             input_volume: Default::default(),
             output_volume: Default::default(),
             power_config: Default::default(),

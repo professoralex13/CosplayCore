@@ -1,14 +1,9 @@
 use core::ops::Range;
 
-use embedded_hal::{
-    digital::OutputPin,
-    spi::{SpiBus, SpiDevice},
-};
-use embedded_hal_bus::spi::DeviceError;
+use esp_idf_hal::sys::EspError;
 
-use self::consts::{AudioWordLength, MAX_MIX_VOLUME, RegisterAddress};
+use self::consts::{AudioWordLength, MicBoost, RegisterAddress, MAX_MIX_VOLUME};
 use super::{AudioChannel, ChannelPair, Codec, PowerConfig};
-use crate::codec::spi::consts::MicBoost;
 
 pub mod consts;
 
@@ -35,26 +30,18 @@ fn pack<T: Into<u16>>(value: T, bits: Range<u8>) -> u16 {
     return (repr & mask(n)) << bits.start;
 }
 
-impl<'a, BUS: SpiBus, CS: OutputPin> Codec<'a, BUS, CS> {
-    fn write_register(
-        &mut self,
-        address: RegisterAddress,
-        value: u16,
-    ) -> Result<(), DeviceError<BUS::Error, CS::Error>> {
+impl<'a> Codec<'a> {
+    fn write_register(&mut self, address: RegisterAddress, value: u16) -> Result<(), EspError> {
         let data = pack(address as u16, 9..16) | pack(value, 0..9);
 
-        self.spi.write(&data.to_be_bytes())
+        self.spi_device.write(&data.to_be_bytes())
     }
 
     pub fn get_input_volume(&self, channel: AudioChannel) -> u8 {
         self.input_volume.get(channel)
     }
 
-    pub fn set_input_volume(
-        &mut self,
-        channel: AudioChannel,
-        volume: u8,
-    ) -> Result<(), DeviceError<BUS::Error, CS::Error>> {
+    pub fn set_input_volume(&mut self, channel: AudioChannel, volume: u8) -> Result<(), EspError> {
         let address = match channel {
             AudioChannel::Left => RegisterAddress::LeftInputVolume,
             AudioChannel::Right => RegisterAddress::RightInputVolume,
@@ -80,11 +67,7 @@ impl<'a, BUS: SpiBus, CS: OutputPin> Codec<'a, BUS, CS> {
         self.output_volume.get(channel)
     }
 
-    pub fn set_output_volume(
-        &mut self,
-        channel: AudioChannel,
-        volume: u8,
-    ) -> Result<(), DeviceError<BUS::Error, CS::Error>> {
+    pub fn set_output_volume(&mut self, channel: AudioChannel, volume: u8) -> Result<(), EspError> {
         let address = match channel {
             AudioChannel::Left => RegisterAddress::LeftOutput1Volume,
             AudioChannel::Right => RegisterAddress::RightOutput1Volume,
@@ -103,10 +86,7 @@ impl<'a, BUS: SpiBus, CS: OutputPin> Codec<'a, BUS, CS> {
         self.power_config
     }
 
-    pub fn set_power_management(
-        &mut self,
-        config: PowerConfig,
-    ) -> Result<(), DeviceError<BUS::Error, CS::Error>> {
+    pub fn set_power_management(&mut self, config: PowerConfig) -> Result<(), EspError> {
         let vmid_selection: u8 = 0b01;
         let vref = true;
 
@@ -148,7 +128,7 @@ impl<'a, BUS: SpiBus, CS: OutputPin> Codec<'a, BUS, CS> {
         channel: AudioChannel,
         left_volume: u8,
         right_volume: u8,
-    ) -> Result<(), DeviceError<BUS::Error, CS::Error>> {
+    ) -> Result<(), EspError> {
         let address1 = if channel == AudioChannel::Left {
             RegisterAddress::LeftOutMix1
         } else {
@@ -196,7 +176,7 @@ impl<'a, BUS: SpiBus, CS: OutputPin> Codec<'a, BUS, CS> {
     pub fn set_digital_audio_interface(
         &mut self,
         word_length: AudioWordLength,
-    ) -> Result<(), DeviceError<BUS::Error, CS::Error>> {
+    ) -> Result<(), EspError> {
         let invert_bclk = false;
         let master_mode = false;
         let swap_left_right = false;
@@ -226,11 +206,7 @@ impl<'a, BUS: SpiBus, CS: OutputPin> Codec<'a, BUS, CS> {
         self.dac_volume.get(channel)
     }
 
-    pub fn set_dac_volume(
-        &mut self,
-        channel: AudioChannel,
-        volume: u8,
-    ) -> Result<(), DeviceError<BUS::Error, CS::Error>> {
+    pub fn set_dac_volume(&mut self, channel: AudioChannel, volume: u8) -> Result<(), EspError> {
         let address = if channel == AudioChannel::Left {
             RegisterAddress::LeftDACVolume
         } else {
@@ -248,7 +224,7 @@ impl<'a, BUS: SpiBus, CS: OutputPin> Codec<'a, BUS, CS> {
         Ok(())
     }
 
-    pub fn set_dac_mute(&mut self, mute: bool) -> Result<(), DeviceError<BUS::Error, CS::Error>> {
+    pub fn set_dac_mute(&mut self, mute: bool) -> Result<(), EspError> {
         let adc_attenuate = false;
         let dac_attenuate = false;
 
@@ -276,7 +252,7 @@ impl<'a, BUS: SpiBus, CS: OutputPin> Codec<'a, BUS, CS> {
         &mut self,
         channel: AudioChannel,
         mic_boost: MicBoost,
-    ) -> Result<(), DeviceError<BUS::Error, CS::Error>> {
+    ) -> Result<(), EspError> {
         let address = match channel {
             AudioChannel::Left => RegisterAddress::ADCLSignalPath,
             AudioChannel::Right => RegisterAddress::ADCRSignalPath,
@@ -289,7 +265,7 @@ impl<'a, BUS: SpiBus, CS: OutputPin> Codec<'a, BUS, CS> {
         Ok(())
     }
 
-    pub fn reset_codec(&mut self) -> Result<(), DeviceError<BUS::Error, CS::Error>> {
+    pub fn reset_codec(&mut self) -> Result<(), EspError> {
         self.write_register(RegisterAddress::Reset, 0)?;
 
         self.set_input_volume(AudioChannel::Left, 0)?;
@@ -308,7 +284,7 @@ impl<'a, BUS: SpiBus, CS: OutputPin> Codec<'a, BUS, CS> {
         self.set_dac_volume(AudioChannel::Left, 0)?;
         self.set_dac_volume(AudioChannel::Right, 0)?;
 
-        self.set_dac_mute(false)?;
+        self.set_dac_mute(true)?;
 
         Ok(())
     }
