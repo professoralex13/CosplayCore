@@ -1,4 +1,5 @@
 use esp_idf_hal::{
+    delay::FreeRtos,
     i2s::{
         config::{
             Config as ChannelConfig, DataBitWidth, SlotMode, StdClkConfig, StdConfig,
@@ -6,8 +7,16 @@ use esp_idf_hal::{
         },
         I2sDriver,
     },
-    prelude::Peripherals,
+    prelude::*,
     spi::{config::DriverConfig, SpiDriver},
+};
+use esp_idf_svc::{
+    bt::{
+        a2dp::{A2dpEvent, ConnectionStatus, EspA2dp},
+        gap::{EspGap, GapEvent},
+        BtClassic, BtDriver, BtStatus,
+    },
+    nvs::EspDefaultNvsPartition,
 };
 
 use crate::codec::{
@@ -74,33 +83,65 @@ fn main() -> anyhow::Result<()> {
     codec1.set_mic_boost(AudioChannel::Left, MicBoost::Db29)?;
     codec1.set_mic_boost(AudioChannel::Right, MicBoost::Db29)?;
 
-    codec1.set_dac_mute(false)?;
+    codec1.set_dac_mute(true)?;
 
     codec1.i2s_driver.tx_enable()?;
 
+    let nvs = EspDefaultNvsPartition::take()?;
+
+    let driver = BtDriver::<BtClassic>::new(peripherals.modem, Some(nvs))?;
+
+    driver.set_device_name("CosplayCore")?;
+
+    let gap_server = EspGap::new(&driver)?;
+
+    gap_server.set_scan_mode(true, esp_idf_svc::bt::gap::DiscoveryMode::Discoverable)?;
+
+    gap_server.subscribe(move |event| match event {
+        GapEvent::AuthenticationCompleted {
+            status,
+            device_name,
+            ..
+        } => {
+            if status == BtStatus::Success {
+                log::info!("Bluetooth authentication success: {device_name}");
+            } else {
+                log::error!("Bluetooth authentication failed, status: {status:?}");
+            }
+        }
+        _ => {}
+    })?;
+
+    let a2dp_sink = EspA2dp::new_sink(&driver)?;
+
+    // TODO: Make this not bad
+    unsafe {
+        a2dp_sink.subscribe_nonstatic(move |event| {
+            match event {
+                A2dpEvent::SinkData(data) => {
+                    codec1.i2s_driver.write(data, 1000).unwrap();
+                }
+                A2dpEvent::ConnectionState { status, .. } => {
+                    if status == ConnectionStatus::Connected {
+                        log::info!("Bluetooth device connected");
+
+                        codec1.set_dac_mute(false).unwrap();
+                    } else {
+                        codec1.set_dac_mute(true).unwrap();
+                    }
+                }
+                A2dpEvent::AudioCodecConfigured { codec, .. } => {
+                    log::info!("Connected to codec: {codec:?}");
+                    // TODO: Use an audio resampler so I2S can stick to 44100Hz
+                }
+                _ => {}
+            };
+            0
+        })?;
+    }
     log::info!("Hello, world!");
 
-    // Write the precomputed wavetable repeatedly — no per-loop computation
     loop {
-        // Generate A4 note (440 Hz) samples at 44100 Hz sample rate
-        let samples_per_cycle = 44100 / 440; // ~100 samples per cycle
-        let mut sample_buffer = vec![0i16; samples_per_cycle * 2]; // stereo, 16-bit samples
-
-        // Fill buffer with sine wave for A4 (440 Hz)
-        for i in 0..samples_per_cycle {
-            let angle = 2.0 * std::f32::consts::PI * i as f32 / samples_per_cycle as f32;
-            let sample = (angle.sin() * 16384.0) as i16; // Scale to ~half of i16 range
-            sample_buffer[i * 2] = sample; // Left channel
-            sample_buffer[i * 2 + 1] = sample; // Right channel
-        }
-
-        // Convert to bytes for I2S transmission
-        let byte_buffer: Vec<u8> = sample_buffer
-            .iter()
-            .flat_map(|&sample| sample.to_le_bytes())
-            .collect();
-
-        // Transmit the audio data
-        codec1.i2s_driver.write(&byte_buffer, 1000)?;
+        FreeRtos::delay_ms(20);
     }
 }
