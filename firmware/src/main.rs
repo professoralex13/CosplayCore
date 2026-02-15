@@ -10,8 +10,6 @@ use esp_idf_hal::{
     spi::{config::DriverConfig, SpiDriver},
 };
 
-use esp_idf_svc::
-
 use crate::codec::{
     spi::consts::{MicBoost, MAX_DAC_VOLUME, MAX_MIX_VOLUME},
     AudioChannel, Codec, PowerConfig,
