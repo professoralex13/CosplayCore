@@ -2,7 +2,7 @@ use core::cell::RefCell;
 
 use embedded_hal::{digital::OutputPin, spi::SpiBus};
 use embedded_hal_bus::spi::{DeviceError, RefCellDevice};
-use esp_hal::delay::Delay;
+use esp_idf_hal::delay::Delay;
 
 pub mod spi;
 
@@ -70,7 +70,7 @@ impl<'a, BUS: SpiBus, CS: OutputPin> Codec<'a, BUS, CS> {
         spi_cs: CS,
     ) -> Result<Self, DeviceError<BUS::Error, CS::Error>> {
         let mut this = Self {
-            spi: RefCellDevice::new(spi_bus, spi_cs, Delay::new())
+            spi: RefCellDevice::new(spi_bus, spi_cs, Delay::new_default())
                 .map_err(|err| DeviceError::<BUS::Error, CS::Error>::Cs(err))?,
             input_volume: Default::default(),
             output_volume: Default::default(),
