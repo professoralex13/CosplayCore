@@ -1,9 +1,13 @@
+use std::sync::Arc;
+
 use esp_idf_hal::{
     gpio::OutputPin,
     i2s::{I2sBiDir, I2sDriver},
     peripheral::Peripheral,
     spi::{config::Config as SpiConfig, SpiDeviceDriver, SpiDriver},
 };
+
+use crate::codec::spi::consts::{MicBoost, MAX_DAC_VOLUME, MAX_MIX_VOLUME};
 pub mod spi;
 
 #[derive(PartialEq, Copy, Clone)]
@@ -51,9 +55,11 @@ pub struct PowerConfig {
 }
 
 pub struct Codec<'a> {
-    spi_device: SpiDeviceDriver<'a, &'a SpiDriver<'a>>,
+    spi_device: SpiDeviceDriver<'a, Arc<SpiDriver<'a>>>,
 
-    pub i2s_driver: I2sDriver<'a, I2sBiDir>,
+    i2s_driver: I2sDriver<'a, I2sBiDir>,
+
+    bluetooth_receiver: &'static global_channel::crossbeam_channel::Receiver<Vec<u8>>,
 
     input_volume: ChannelPair<u8>,
 
@@ -68,13 +74,15 @@ pub struct Codec<'a> {
 
 impl<'a> Codec<'a> {
     pub fn new(
-        spi_driver: &'a SpiDriver,
+        spi_driver: Arc<SpiDriver<'a>>,
         spi_cs: impl Peripheral<P = impl OutputPin> + 'a,
         i2s_driver: I2sDriver<'a, I2sBiDir>,
+        bluetooth_receiver: &'static global_channel::crossbeam_channel::Receiver<Vec<u8>>,
     ) -> anyhow::Result<Self> {
         let mut this = Self {
             spi_device: SpiDeviceDriver::new(spi_driver, Some(spi_cs), &SpiConfig::new())?,
             i2s_driver,
+            bluetooth_receiver,
             input_volume: Default::default(),
             output_volume: Default::default(),
             power_config: Default::default(),
@@ -85,5 +93,43 @@ impl<'a> Codec<'a> {
         this.reset_codec()?;
 
         Ok(this)
+    }
+
+    pub fn entrypoint(mut self) -> anyhow::Result<()> {
+        self.set_power_management(PowerConfig {
+            adc_left: false,
+            adc_right: false,
+            dac_left: true,
+            dac_right: true,
+            left_out_1: true,
+            right_out_1: true,
+            pga_left: true,
+            pga_right: true,
+        })?;
+
+        self.set_input_volume(AudioChannel::Left, 50)?;
+        self.set_input_volume(AudioChannel::Right, 50)?;
+
+        self.set_output_volume(AudioChannel::Left, 0b1100000)?;
+        self.set_output_volume(AudioChannel::Right, 0b1100000)?;
+
+        self.set_mix(AudioChannel::Left, MAX_MIX_VOLUME, 0)?;
+        self.set_mix(AudioChannel::Right, 0, MAX_MIX_VOLUME)?;
+
+        self.set_dac_volume(AudioChannel::Left, MAX_DAC_VOLUME)?;
+        self.set_dac_volume(AudioChannel::Right, MAX_DAC_VOLUME)?;
+
+        self.set_mic_boost(AudioChannel::Left, MicBoost::Db29)?;
+        self.set_mic_boost(AudioChannel::Right, MicBoost::Db29)?;
+
+        self.set_dac_mute(false)?;
+
+        self.i2s_driver.tx_enable()?;
+
+        loop {
+            let data = self.bluetooth_receiver.recv()?;
+
+            self.i2s_driver.write_all(data.as_slice(), 1000)?;
+        }
     }
 }

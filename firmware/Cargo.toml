@@ -22,6 +22,7 @@ log = "0.4"
 esp-idf-svc = { version= "0.51", features=["alloc", "experimental"] }
 anyhow = "1.0.101"
 esp-idf-hal = "0.45.2"
+global-channel = "0.2.0"
 
 [build-dependencies]
 embuild = "0.33"
